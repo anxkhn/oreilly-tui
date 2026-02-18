@@ -1,8 +1,6 @@
-# O'Reilly Ingest
+# O'Reilly Downloader
 
-We're in the AI era. You want to chat with your favorite technical books using Claude Code, Cursor, or any LLM tool. This gets you there.
-
-Export any O'Reilly book to Markdown, PDF, EPUB, JSON, or plain text. Download by chapters so you don't burn through your context window.
+O'Reilly Book Downloader - Export any O'Reilly book to Markdown, PDF, EPUB, JSON, or plain text for personal and educational use.
 
 ## Disclaimer
 
@@ -24,8 +22,8 @@ For personal and educational use only. Please read the [O'Reilly Terms of Servic
 
 ### Docker (Recommended for most users)
 ```bash
-git clone https://github.com/mosaibah/oreilly-downloader.git
-cd oreilly-downloader
+git clone https://github.com/anxkhn/oreilly-tui.git
+cd oreilly-tui
 docker compose up -d
 ```
 Then open http://localhost:8000
@@ -36,8 +34,8 @@ Then open http://localhost:8000
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and setup
-git clone https://github.com/mosaibah/oreilly-downloader.git
-cd oreilly-downloader
+git clone https://github.com/anxkhn/oreilly-tui.git
+cd oreilly-tui
 
 # Install system dependencies (macOS only, for PDF support)
 brew install pango pygobject
@@ -104,9 +102,9 @@ If you already have an O'Reilly account or prefer manual setup:
 1. Open [learning.oreilly.com](https://learning.oreilly.com) and log in
 2. Open browser console (press F12 → Console)
 3. Paste this command and press Enter:
-   ```javascript
-   JSON.stringify(document.cookie.split(";").map(c=>c.split("=")).reduce((r,[k,v])=>({...r,[k.trim()]:v?.trim()}),{}))
-   ```
+    ```javascript
+    JSON.stringify(document.cookie.split(";").map(c=>c.split("=")).reduce((r,[k,v])=>({...r,[k.trim()]:v?.trim()}),{}))
+    ```
 4. Copy the output and save it to `cookies.json` in JSON format
 
 ## Architecture

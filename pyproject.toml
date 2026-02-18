@@ -1,7 +1,7 @@
 [project]
-name = "oreilly-downloader"
+name = "oreilly-tui"
 version = "0.1.0"
-description = "O'Reilly book ingest tool - Export books to LLM-ready formats"
+description = "O'Reilly Book Downloader - Export books to LLM-ready formats"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
