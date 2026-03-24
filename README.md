@@ -14,7 +14,7 @@ For personal and educational use only. Please read the [O'Reilly Terms of Servic
 - **O'Reilly V2 API** - fast and reliable
 - **Images & styles included** - complete book experience
 - **Web UI** - search, preview, download
-- **TUI** - Terminal User Interface for full CLI interaction
+- **CLI** - simple terminal interface
 
 <img src="docs/main.png" alt="Main Page">
 
@@ -43,13 +43,13 @@ brew install pango pygobject
 # Install dependencies and run
 uv sync
 
-# Run web UI
+# Run CLI (default)
 uv run main.py
 
-# Run TUI (Terminal UI)
-uv run main.py --tui
+# Run web UI
+uv run main.py --web
 ```
-Then open http://localhost:8000
+For web UI, open http://localhost:8000
 
 ### Python with pip (Legacy)
 ```bash
@@ -79,7 +79,7 @@ Already included in Dockerfile - no action needed.
 
 ### Academic Registration (SSO Loophole) - Automatic
 
-The TUI provides automatic registration using an SSO academic registration loophole. No account needed.
+The CLI provides automatic registration using an SSO academic registration loophole. No account needed.
 
 **How it works:**
 1. Generate a random academic email (e.g., user@baylor.edu)
@@ -87,11 +87,11 @@ The TUI provides automatic registration using an SSO academic registration looph
 3. Extract authentication cookies from the response
 4. Save cookies automatically to `cookies.json`
 
-**Usage in TUI:**
+**Usage in CLI:**
 ```bash
-uv run main.py --tui
+uv run main.py
 ```
-Then select "Register & Get Cookies" from the main menu.
+Then select "Cookies" and choose auto-register from the menu.
 
 > **Note**: This method exploits an SSO implementation flaw in the academic registration endpoint and may stop working if O'Reilly patches it. Use for educational purposes only.
 

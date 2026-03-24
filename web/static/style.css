@@ -1,20 +1,14 @@
 /**
- * O'Reilly Ingest - Minimal CSS
- * Most styles are now in Tailwind. This file contains only:
- * - Base reset
- * - Scrollbar styling
- * - Has-expanded state for dimming cards
+ * O'Reilly Downloader
  */
 
-/* Base reset */
 *, *::before, *::after {
     box-sizing: border-box;
 }
 
-/* Scrollbar styling for description and chapters list */
 .book-description::-webkit-scrollbar,
 .chapters-list::-webkit-scrollbar {
-    width: 4px;
+    width: 3px;
 }
 
 .book-description::-webkit-scrollbar-track,
@@ -33,13 +27,23 @@
     background: #a1a1aa;
 }
 
-/* Dim non-expanded cards when one is expanded */
 #search-results.has-expanded .book-card:not(.expanded) {
-    opacity: 0.4;
+    opacity: 0.35;
     pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Checkbox accent color */
+#search-results.has-expanded .book-card.expanded {
+    transition: box-shadow 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 input[type="checkbox"] {
     accent-color: #0073e6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms;
+        transition-duration: 0.01ms;
+    }
 }

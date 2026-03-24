@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Callable
 
+from requests.exceptions import RequestException
+
 from .base import Plugin
 
 
@@ -10,7 +12,11 @@ class AssetsPlugin(Plugin):
             return True
 
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        content = self.http.get_bytes(url)
+        try:
+            content = self.http.get_bytes(url)
+        except RequestException as e:
+            print(f"[WARN] Failed to download image {url}: {e}")
+            return False
         save_path.write_bytes(content)
         return True
 
@@ -19,7 +25,11 @@ class AssetsPlugin(Plugin):
             return True
 
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        content = self.http.get_text(url)
+        try:
+            content = self.http.get_text(url)
+        except RequestException as e:
+            print(f"[WARN] Failed to download CSS {url}: {e}")
+            return False
         save_path.write_text(content)
         return True
 
