@@ -1,4 +1,4 @@
-"""Web server for O'Reilly Ingest."""
+"""Web server for O'Reilly Downloader."""
 
 import json
 import re
@@ -134,11 +134,7 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_formats(self):
-        """Return available output formats for discovery.
-
-        This endpoint allows any client (web, CLI, etc.) to discover
-        supported formats, aliases, and which formats support chapter selection.
-        """
+        """Return available output formats."""
         from plugins.downloader import DownloaderPlugin
 
         self._send_json(DownloaderPlugin.get_formats_info())
@@ -149,7 +145,6 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
         output_plugin = self.kernel["output"]
 
         if data.get("browse"):
-            # Open native folder picker dialog
             initial_dir = config.OUTPUT_DIR
             selected = system_plugin.show_folder_picker(initial_dir)
             if selected:
@@ -228,7 +223,6 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "book_id required"}, 400)
             return
 
-        # Parse chunking config
         chunk_config = None
         if chunking_opts:
             chunk_size = chunking_opts.get("chunk_size", 4000)
@@ -239,7 +233,6 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
                 respect_boundaries=True,
             )
 
-        # Validate output directory
         output_plugin = self.kernel["output"]
         if output_dir_str:
             success, message, output_dir = output_plugin.validate_dir(output_dir_str)
@@ -249,19 +242,16 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
         else:
             output_dir = output_plugin.get_default_dir()
 
-        # Check if already downloading
         with self._progress_lock:
             status = self.download_progress.get("status")
             if status and status not in ("completed", "error", "cancelled"):
                 self._send_json({"error": "Download already in progress"}, 409)
                 return
 
-        # Parse formats using plugin (single source of truth)
         from plugins.downloader import DownloaderPlugin
 
         formats = DownloaderPlugin.parse_formats(output_format)
 
-        # Start download in background thread
         thread = threading.Thread(
             target=self._download_book_async,
             args=(
@@ -276,7 +266,6 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
         )
         thread.start()
 
-        # Return immediately
         self._send_json({"status": "started", "book_id": book_id})
 
     def _download_book_async(
@@ -289,7 +278,6 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
         chunk_config: ChunkConfig | None,
     ):
         """Background download wrapper with error handling."""
-        # Reset cancel flag
         DownloaderHandler._cancel_requested = False
 
         try:

@@ -21,7 +21,6 @@ class OutputPlugin(Plugin):
 
         path = Path(path) if isinstance(path, str) else path
 
-        # Try to create if doesn't exist
         if not path.exists():
             try:
                 path.mkdir(parents=True, exist_ok=True)
@@ -31,7 +30,6 @@ class OutputPlugin(Plugin):
         if not path.is_dir():
             return False, "Path is not a directory", None
 
-        # Check writability
         try:
             test_file = path / ".write_test"
             test_file.touch()
@@ -49,7 +47,6 @@ class OutputPlugin(Plugin):
         authors: list[str] | None = None,
     ) -> Path:
         """Create a book output directory with conflict resolution."""
-        # Build folder name with fallback chain
         folder_title = (title or "").strip()
         if not folder_title and authors:
             folder_title = f"Book by {authors[0]}"
@@ -62,11 +59,9 @@ class OutputPlugin(Plugin):
         # Handle same-title-different-book conflicts
         book_dir = self._resolve_conflict(book_dir, book_id)
 
-        # Create the directory structure
         oebps = book_dir / "OEBPS"
         oebps.mkdir(parents=True, exist_ok=True)
 
-        # Write book_id for future reference
         meta_file = book_dir / ".book_id"
         meta_file.write_text(book_id)
 

@@ -7,18 +7,14 @@ from web.server import run_server
 
 def main():
     parser = argparse.ArgumentParser(description="O'Reilly Book Downloader")
+    parser.add_argument(
+        "--web", action="store_true", help="Launch web server instead of CLI"
+    )
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--port", type=int, default=8000, help="Server port")
-    parser.add_argument(
-        "--tui", action="store_true", help="Launch Terminal UI instead of web server"
-    )
     args = parser.parse_args()
 
-    if args.tui:
-        from cli.tui import main as tui_main
-
-        tui_main()
-    else:
+    if args.web:
         print("=" * 50)
         print("  O'Reilly Downloader")
         print("=" * 50)
@@ -27,6 +23,10 @@ def main():
         print("=" * 50)
 
         run_server(args.host, args.port)
+    else:
+        from cli.simple_tui import main as cli_main
+
+        cli_main()
 
 
 if __name__ == "__main__":
