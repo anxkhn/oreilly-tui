@@ -14,7 +14,8 @@ For personal and educational use only. Please read the [O'Reilly Terms of Servic
 - **O'Reilly V2 API** - fast and reliable
 - **Images & styles included** - complete book experience
 - **Web UI** - search, preview, download
-- **TUI** - Terminal User Interface for full CLI interaction
+- **Simple TUI** - Lightweight command-line interface (default)
+- **Rich TUI** - Full-featured terminal UI with `--rich-tui`
 
 <img src="docs/main.png" alt="Main Page">
 
@@ -43,11 +44,14 @@ brew install pango pygobject
 # Install dependencies and run
 uv sync
 
-# Run web UI
+# Run Simple TUI (Terminal UI) - Default
 uv run main.py
 
-# Run TUI (Terminal UI)
-uv run main.py --tui
+# Run Rich TUI (full-featured terminal UI)
+uv run main.py --rich-tui
+
+# Run web UI
+uv run main.py --web
 ```
 Then open http://localhost:8000
 
@@ -79,7 +83,7 @@ Already included in Dockerfile - no action needed.
 
 ### Academic Registration (SSO Loophole) - Automatic
 
-The TUI provides automatic registration using an SSO academic registration loophole. No account needed.
+Both TUI modes and the web UI provide automatic registration using an SSO academic registration loophole. No account needed.
 
 **How it works:**
 1. Generate a random academic email (e.g., user@baylor.edu)
@@ -87,13 +91,22 @@ The TUI provides automatic registration using an SSO academic registration looph
 3. Extract authentication cookies from the response
 4. Save cookies automatically to `cookies.json`
 
-**Usage in TUI:**
+**Usage:**
 ```bash
-uv run main.py --tui
-```
-Then select "Register & Get Cookies" from the main menu.
+# Simple TUI (default)
+uv run main.py
+# Then select "Set Cookies" -> "Auto-register"
 
-> **Note**: This method exploits an SSO implementation flaw in the academic registration endpoint and may stop working if O'Reilly patches it. Use for educational purposes only.
+# Rich TUI
+uv run main.py --rich-tui
+# Then select "Set Cookies" -> "Register & Get Cookies"
+
+# Web UI
+uv run main.py --web
+# Click "Auto-Register" button
+```
+
+> **Note**: This method exploits an SSO implementation flaw in the academic registration endpoint and may not work reliably. O'Reilly has tightened validation. If auto-registration fails (returns 422 error), use manual browser cookies instead.
 
 ### Manual Browser Cookies (Alternative)
 
@@ -103,9 +116,20 @@ If you already have an O'Reilly account or prefer manual setup:
 2. Open browser console (press F12 → Console)
 3. Paste this command and press Enter:
     ```javascript
-    JSON.stringify(document.cookie.split(";").map(c=>c.split("=")).reduce((r,[k,v])=>({...r,[k.trim()]:v?.trim()}),{}))
+    copy(document.cookie)
     ```
-4. Copy the output and save it to `cookies.json` in JSON format
+4. The cookie string is now in your clipboard
+5. Run this in TUI or paste into a JSON converter online:
+    ```
+    orm-jwt=YOUR_JWT_VALUE; orm-rt=YOUR_RT_VALUE; ...
+    ```
+6. Or use this helper to convert cookie string to JSON in TUI's paste mode
+
+**Alternative: Use browser DevTools directly**
+1. Open learning.oreilly.com and log in
+2. Press F12 → Application tab → Cookies → https://learning.oreilly.com
+3. Copy the values for `orm-jwt` and `orm-rt` (and any other cookies you want)
+4. Format as JSON: `{"orm-jwt":"value","orm-rt":"value"}`
 
 ## Architecture
 

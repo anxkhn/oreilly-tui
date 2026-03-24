@@ -5,37 +5,41 @@ import random
 import string
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from textual.app import App, ComposeResult
+from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import (
     Button,
-    Header,
+    DataTable,
     Footer,
-    Static,
+    Header,
     Input,
+    Label,
     ListItem,
     ListView,
     ProgressBar,
-    DataTable,
-    Label,
+    Static,
+    TextArea,
 )
-from textual.containers import Container, Horizontal, Vertical
-from textual.message import Message
 from textual import on
+
 from core.kernel import create_default_kernel
-from plugins.downloader import DownloaderPlugin
+from plugins.downloader import DownloaderPlugin, DownloadProgress
+
 import asyncio
+import concurrent.futures
 
 
 class MainScreen(Screen):
     """Main menu screen."""
 
     BINDINGS = [
-        ("c", "push_screen('cookies')", "Cookies"),
-        ("s", "push_screen('search')", "Search"),
-        ("d", "push_screen('downloads')", "Downloads"),
-        ("q", "quit", "Quit"),
+        ("c", "app.push_screen_to_name('cookies')", "Cookies"),
+        ("s", "app.push_screen_to_name('search')", "Search"),
+        ("d", "app.push_screen_to_name('downloads')", "Downloads"),
+        ("q", "app.quit", "Quit"),
     ]
 
     def __init__(self, kernel):
@@ -58,11 +62,11 @@ class MainScreen(Screen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-cookies":
-            self.app.push_screen("cookies")
+            self.app.push_screen_to_name("cookies")
         elif event.button.id == "btn-search":
-            self.app.push_screen("search")
+            self.app.push_screen_to_name("search")
         elif event.button.id == "btn-downloads":
-            self.app.push_screen("downloads")
+            self.app.push_screen_to_name("downloads")
         elif event.button.id == "btn-exit":
             self.app.exit()
 
@@ -80,11 +84,10 @@ class CookiesScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Container(
-            Static("O'Reilly Academic Registration (SSO Loophole)", classes="title"),
+            Static("O'Reilly Academic Registration (SSO Loophole)"),
             Static(
                 "Click below to auto-register using academic SSO loophole. "
                 "This uses a random academic email domain to get free access.",
-                classes="info",
             ),
             Vertical(
                 Button(
@@ -94,6 +97,7 @@ class CookiesScreen(Screen):
                     disabled=self.registering,
                 ),
                 Button("Test Existing Cookies", id="btn-test"),
+                Button("Paste Cookie JSON", id="btn-paste"),
                 Button("Back", id="btn-back"),
             ),
             id="cookies-container",
@@ -107,21 +111,12 @@ class CookiesScreen(Screen):
             self._register_academic()
         elif event.button.id == "btn-test":
             self._test_cookies()
+        elif event.button.id == "btn-paste":
+            self.app.push_screen_to_name("cookie_input")
 
     def _generate_random_email(self) -> str:
         """Generate a random academic email for registration."""
-        domains = [
-            "baylor.edu",
-            "tamu.edu",
-            "stanford.edu",
-            "mit.edu",
-            "gatech.edu",
-            "harvard.edu",
-            "yale.edu",
-            "princeton.edu",
-            "columbia.edu",
-            "duke.edu",
-        ]
+        domains = ["baylor.edu"]
         username = "".join(random.choices(string.ascii_lowercase, k=10))
         domain = random.choice(domains)
         return f"{username}@{domain}"
@@ -134,75 +129,44 @@ class CookiesScreen(Screen):
             email = self._generate_random_email()
             self.app.notify(f"Registering with {email}...", severity="information")
 
-            cmd = [
-                "curl",
+            headers = {
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.7",
+                "Cache-Control": "no-cache",
+                "Content-Type": "application/json",
+                "Origin": "https://www.oreilly.com",
+            }
+
+            import requests
+
+            session = requests.Session()
+            session.headers.update(headers)
+
+            data = {
+                "email": email,
+                "signature": "",
+                "timestamp": "",
+                "referer": "",
+                "ar": "true",
+            }
+
+            response = session.post(
                 "https://www.oreilly.com/api/v1/registration/academic/",
-                "-H",
-                "accept: */*",
-                "-H",
-                "accept-language: en-US,en;q=0.7",
-                "-H",
-                "cache-control: no-cache",
-                "-H",
-                "content-type: application/json",
-                "-H",
-                "origin: https://www.oreilly.com",
-                "-H",
-                "pragma: no-cache",
-                "-H",
-                "priority: u=1, i",
-                "-H",
-                "referer: https://www.oreilly.com/",
-                "-H",
-                "sec-ch-ua: 'Not A-Brand';v='99', 'Brave';v='145', 'Chromium';v='145'",
-                "-H",
-                "sec-ch-ua-mobile: ?0",
-                "-H",
-                "sec-ch-ua-platform: 'macOS'",
-                "-H",
-                "sec-fetch-dest: empty",
-                "-H",
-                "sec-fetch-mode: cors",
-                "-H",
-                "sec-gpc: 1",
-                "-H",
-                "user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-                "--data-raw",
-                json.dumps(
-                    {
-                        "email": email,
-                        "signature": "",
-                        "timestamp": "",
-                        "referer": "",
-                        "ar": "true",
-                    }
-                ),
-                "-v",  # Include response headers
-                "-s",  # Silent
-                "-L",  # Follow redirects
-            ]
+                json=data,
+                timeout=30,
+            )
 
-            result = subprocess.run(cmd, capture_output=True, text=True)
-
-            if result.returncode != 0:
+            if response.status_code != 200:
                 self.app.notify(
-                    f"Registration failed: {result.stderr}", severity="error"
+                    f"Registration failed: HTTP {response.status_code}",
+                    severity="error",
                 )
                 self.registering = False
                 return
 
-            output = result.stdout + result.stderr
             cookies_dict = {}
-
-            for line in output.split("\n"):
-                if line.startswith("< set-cookie:"):
-                    cookie_line = line[13:].strip()
-                    if cookie_line.startswith("orm-jwt="):
-                        cookies_dict["orm-jwt"] = cookie_line[8:]
-                    elif cookie_line.startswith("orm-rt="):
-                        cookies_dict["orm-rt"] = cookie_line[7:]
-                    elif cookie_line.startswith("_vwo_uuid_v2="):
-                        cookies_dict["_vwo_uuid_v2"] = cookie_line[15:].split(";")[0]
+            for cookie in session.cookies:
+                cookies_dict[cookie.name] = cookie.value
 
             if not cookies_dict or "orm-jwt" not in cookies_dict:
                 self.app.notify(
@@ -214,8 +178,9 @@ class CookiesScreen(Screen):
 
             cookies_file = Path("cookies.json")
             cookies_file.write_text(json.dumps(cookies_dict, indent=2))
+            self.kernel.http.reload_cookies()
             self.app.notify(
-                f"Successfully registered and saved cookies!", severity="success"
+                "Successfully registered and saved cookies!", severity="information"
             )
 
         except Exception as e:
@@ -234,9 +199,62 @@ class CookiesScreen(Screen):
         auth = self.kernel.get("auth")
         is_valid = auth.validate_session()
         if is_valid:
-            self.app.notify("Cookies are valid!", severity="success")
+            self.app.notify("Cookies are valid!", severity="information")
         else:
             self.app.notify("Cookies are invalid!", severity="error")
+
+
+class CookieInputScreen(Screen):
+    """Screen for manually pasting cookie JSON."""
+
+    BINDINGS = [("escape", "app.pop_screen", "Back")]
+
+    def __init__(self, kernel):
+        super().__init__()
+        self.kernel = kernel
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Container(
+            Static("Paste Cookie JSON"),
+            Static("Paste your browser cookie JSON below:"),
+            TextArea(
+                id="cookie-input", placeholder='{"orm-jwt": "...", "orm-rt": "..."}'
+            ),
+            Vertical(
+                Button("Save", id="btn-save", variant="primary"),
+                Button("Back", id="btn-back"),
+            ),
+            id="cookie-input-container",
+        )
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-back":
+            self.app.pop_screen()
+        elif event.button.id == "btn-save":
+            self._save_cookies()
+
+    def _save_cookies(self):
+        input_widget = self.query_one("#cookie-input", TextArea)
+        cookie_text = input_widget.text.strip()
+
+        if not cookie_text:
+            self.app.notify("Please paste cookie JSON", severity="warning")
+            return
+
+        try:
+            cookies = json.loads(cookie_text)
+            if not isinstance(cookies, dict):
+                raise ValueError("Invalid format")
+
+            cookies_file = Path("cookies.json")
+            cookies_file.write_text(json.dumps(cookies, indent=2))
+            self.kernel.http.reload_cookies()
+            self.app.notify("Cookies saved successfully!", severity="information")
+            self.app.pop_screen()
+        except Exception as e:
+            self.app.notify(f"Invalid JSON: {str(e)}", severity="error")
 
 
 class SearchScreen(Screen):
@@ -244,7 +262,7 @@ class SearchScreen(Screen):
 
     BINDINGS = [
         ("escape", "app.pop_screen", "Back"),
-        ("s", "search", "Search"),
+        ("s", "search_books", "Search"),
         ("r", "reset_search", "Reset"),
     ]
 
@@ -281,9 +299,11 @@ class SearchScreen(Screen):
             self._perform_search(search_input.value)
         elif event.button.id == "btn-select":
             table = self.query_one("#results-table", DataTable)
-            if table.cursor_row:
+            if table.cursor_row is not None and table.cursor_row < len(
+                self.search_results
+            ):
                 book_id = self.search_results[table.cursor_row][0]
-                self.app.push_screen("book", book_id)
+                self.app.push_screen_to_name("book", book_id)
 
     def _perform_search(self, query: str):
         if not query or len(query) < 2:
@@ -298,13 +318,13 @@ class SearchScreen(Screen):
             ]
             table = self.query_one("#results-table", DataTable)
 
-            table.add_column("ID", key="id")
-            table.add_column("Title", key="title")
-            table.add_column("Authors", key="authors")
-
             table.clear()
+            table.add_column("ID")
+            table.add_column("Title")
+            table.add_column("Authors")
+
             for result in self.search_results:
-                table.add_row(id=result[0], title=result[1], authors=result[2])
+                table.add_row(*result)
 
             self.app.notify(f"Found {len(results)} books", severity="information")
         except Exception as e:
@@ -332,7 +352,7 @@ class BookDetailsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Container(
-            Static(f"Book ID: {self.book_id}", id="book-id"),
+            Static(f"Book ID: {self.book_id}"),
             Vertical(
                 Static("Loading book details...", id="loading-msg"),
                 id="book-details",
@@ -354,13 +374,12 @@ class BookDetailsScreen(Screen):
 
             details.mount(
                 Static(
-                    f"Title: {self.book_info.get('title', 'Unknown')}", classes="title"
+                    f"Title: {self.book_info.get('title', 'Unknown')}",
                 ),
                 Static(
                     f"Authors: {', '.join(self.book_info.get('authors', []))}",
-                    classes="authors",
                 ),
-                Static(f"Chapters: {len(self.chapters)}", classes="chapters"),
+                Static(f"Chapters: {len(self.chapters)}"),
                 Button("Download EPUB", id="btn-epub", variant="primary"),
                 Button("Download Markdown", id="btn-markdown"),
                 Button("Download PDF", id="btn-pdf"),
@@ -380,15 +399,15 @@ class BookDetailsScreen(Screen):
                 "btn-pdf": "pdf",
                 "btn-all": "all",
             }
-            self.app.push_screen(
-                "download", (self.book_id, format_map[event.button.id])
+            self.app.push_screen_to_name(
+                "download", self.book_id, format_map[event.button.id]
             )
 
 
 class DownloadScreen(Screen):
     """Download progress screen."""
 
-    BINDINGS = [("c", "cancel", "Cancel")]
+    BINDINGS = [("c", "cancel_download", "Cancel")]
 
     def __init__(self, kernel, book_id, format_type):
         super().__init__()
@@ -397,27 +416,38 @@ class DownloadScreen(Screen):
         self.format_type = format_type
         self.progress = 0
         self.status = "Starting..."
-
-    def on_mount(self) -> None:
-        self._start_download()
+        self.download_task = None
+        self.is_complete = False
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Container(
-            Static(f"Downloading: {self.book_id}", classes="title"),
-            Static(f"Format: {self.format_type}", classes="format"),
-            Static(f"Status: {self.status}", id="status-msg", classes="status"),
+            Static(f"Downloading: {self.book_id}"),
+            Static(f"Format: {self.format_type}"),
+            Static(f"Status: {self.status}", id="status-msg"),
             ProgressBar(total=100, show_eta=True, id="progress-bar"),
             Button("Cancel", id="btn-cancel", variant="error"),
             id="download-container",
         )
         yield Footer()
 
+    async def on_mount(self) -> None:
+        self._start_download()
+        while not self.is_complete:
+            await asyncio.sleep(0.1)
+
+        if self.is_complete:
+            self.query_one("#status-msg", Static).update("Download complete!")
+            cancel_btn = self.query_one("#btn-cancel", Button)
+            cancel_btn.label = "Done"
+            cancel_btn.variant = "primary"
+            cancel_btn.id = "btn-done"
+
     def _start_download(self):
         downloader = self.kernel.get("downloader")
-        from pathlib import Path
+        loop = asyncio.get_event_loop()
 
-        def progress_callback(progress):
+        def progress_callback(progress: DownloadProgress):
             self.progress = progress.percentage
             self.status = progress.status
             self.query_one("#status-msg", Static).update(f"Status: {progress.status}")
@@ -425,17 +455,26 @@ class DownloadScreen(Screen):
                 progress=progress.percentage / 100
             )
 
-        asyncio.create_task(
-            downloader.download(
-                book_id=self.book_id,
-                output_dir=Path("output"),
-                formats=DownloaderPlugin.parse_formats(self.format_type),
-                progress_callback=progress_callback,
-            )
-        )
+        def run_download():
+            try:
+                downloader.download(
+                    book_id=self.book_id,
+                    output_dir=Path("output"),
+                    formats=DownloaderPlugin.parse_formats(self.format_type),
+                    progress_callback=progress_callback,
+                )
+                self.is_complete = True
+            except Exception as e:
+                self.status = f"Error: {str(e)}"
+                self.query_one("#status-msg", Static).update(self.status)
+
+        self.download_task = loop.run_in_executor(None, run_download)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-cancel":
+        if event.button.id == "btn-cancel" and self.download_task:
+            self.download_task.cancel()
+            self.app.pop_screen()
+        elif event.button.id == "btn-done":
             self.app.pop_screen()
 
 
@@ -471,9 +510,9 @@ class DownloadsScreen(Screen):
 
         output_dir = Path("output")
         if not output_dir.exists():
-            self.query_one("#downloads-table", DataTable).add_column(
-                "No downloads found"
-            )
+            table = self.query_one("#downloads-table", DataTable)
+            table.add_column("Message")
+            table.add_row("No downloads found")
             return
 
         downloads = []
@@ -482,13 +521,13 @@ class DownloadsScreen(Screen):
                 downloads.append((item.name, os.path.getsize(item)))
 
         table = self.query_one("#downloads-table", DataTable)
-        table.add_column("Name", key="name")
-        table.add_column("Size", key="size")
-
         table.clear()
+        table.add_column("Name")
+        table.add_column("Size")
+
         for name, size in downloads:
             size_mb = f"{size / (1024 * 1024):.2f} MB" if size > 0 else "0 MB"
-            table.add_row(name=name, size=size_mb)
+            table.add_row(name, size_mb)
 
 
 class OreillyTuiApp(App):
@@ -504,44 +543,36 @@ class OreillyTuiApp(App):
     Button {
         margin: 1;
     }
-    .title {
-        text-style: bold;
-        text-align: center;
-        margin: 2;
-    }
-    .format {
-        text-style: italic;
-        text-align: center;
-    }
-    .status {
-        text-align: center;
-        margin: 1;
+    Container {
+        padding: 2;
     }
     """
-
-    SCREENS = {
-        "main": MainScreen,
-        "cookies": CookiesScreen,
-        "search": SearchScreen,
-        "book": BookDetailsScreen,
-        "download": DownloadScreen,
-        "downloads": DownloadsScreen,
-    }
 
     def __init__(self, kernel):
         super().__init__()
         self.kernel = kernel
 
     def on_mount(self) -> None:
-        self.push_screen("main")
+        self.push_screen_to_name("main")
 
-    def push_screen(self, screen_name: str, *args):
-        if screen_name in self.SCREENS:
+    def push_screen_to_name(self, screen_name: str, *args: Any):
+        """Push a screen by name with optional arguments."""
+        screen_classes = {
+            "main": MainScreen,
+            "cookies": CookiesScreen,
+            "cookie_input": CookieInputScreen,
+            "search": SearchScreen,
+            "book": BookDetailsScreen,
+            "download": DownloadScreen,
+            "downloads": DownloadsScreen,
+        }
+
+        if screen_name in screen_classes:
             if args:
-                screen = self.SCREENS[screen_name](self.kernel, *args)
+                screen = screen_classes[screen_name](self.kernel, *args)
             else:
-                screen = self.SCREENS[screen_name](self.kernel)
-            self.push_screen(screen)
+                screen = screen_classes[screen_name](self.kernel)
+            super().push_screen(screen)
 
 
 def main():

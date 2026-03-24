@@ -10,15 +10,16 @@ def main():
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--port", type=int, default=8000, help="Server port")
     parser.add_argument(
-        "--tui", action="store_true", help="Launch Terminal UI instead of web server"
+        "--web", action="store_true", help="Launch web server instead of TUI"
+    )
+    parser.add_argument(
+        "--rich-tui",
+        action="store_true",
+        help="Use rich Textual TUI instead of simple TUI",
     )
     args = parser.parse_args()
 
-    if args.tui:
-        from cli.tui import main as tui_main
-
-        tui_main()
-    else:
+    if args.web:
         print("=" * 50)
         print("  O'Reilly Downloader")
         print("=" * 50)
@@ -27,6 +28,14 @@ def main():
         print("=" * 50)
 
         run_server(args.host, args.port)
+    elif args.rich_tui:
+        from cli.tui import main as tui_main
+
+        tui_main()
+    else:
+        from cli.simple_tui import main as simple_tui_main
+
+        simple_tui_main()
 
 
 if __name__ == "__main__":

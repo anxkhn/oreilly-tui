@@ -26,16 +26,19 @@ async function checkAuth() {
         const statusDot = el.querySelector('.status-dot');
         const statusText = el.querySelector('.status-text');
 
+        const registerBtn = document.getElementById('register-btn');
         if (data.valid) {
             if (statusText) statusText.textContent = 'Session Valid';
             statusDot.className = 'status-dot w-2 h-2 rounded-full bg-emerald-500';
             el.className = 'flex items-center gap-2 text-sm text-emerald-600';
             loginBtn.classList.add('hidden');
+            registerBtn.classList.add('hidden');
         } else {
             if (statusText) statusText.textContent = data.reason || 'Invalid';
             statusDot.className = 'status-dot w-2 h-2 rounded-full bg-amber-500';
             el.className = 'flex items-center gap-2 text-sm text-amber-600';
             loginBtn.classList.remove('hidden');
+            registerBtn.classList.remove('hidden');
         }
     } catch (err) {
         console.error('Auth check failed:', err);
@@ -54,28 +57,51 @@ function hideCookieModal() {
     document.body.style.overflow = '';
 }
 
+async function autoRegister() {
+    try {
+        const res = await fetch(`${API}/api/register-academic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            alert('Registration failed: ' + data.error);
+            return;
+        }
+
+        alert(`Successfully registered with academic email: ${data.email}`);
+        checkAuth();
+    } catch (err) {
+        alert('Registration failed: ' + err.message);
+    }
+}
+
 async function saveCookies() {
     const input = document.getElementById('cookie-input').value.trim();
     const errorEl = document.getElementById('cookie-error');
 
     if (!input) {
-        errorEl.textContent = 'Please paste your cookie JSON';
+        errorEl.textContent = 'Please paste your cookie JSON or string';
         errorEl.classList.remove('hidden');
         return;
     }
 
-    let cookies;
+    let dataToSend;
+
     try {
-        if ((input.startsWith("'") && input.endsWith("'")) ||
-            (input.startsWith('"') && input.endsWith('"'))) {
-            input = input.slice(1, -1);
-        }
-        cookies = JSON.parse(input);
-        if (typeof cookies !== 'object' || Array.isArray(cookies)) {
-            throw new Error('Must be a JSON object');
+        if (input.includes('=')) {
+            dataToSend = { cookie_string: input };
+        } else {
+            let cookies = JSON.parse(input);
+            if (typeof cookies !== 'object' || Array.isArray(cookies)) {
+                throw new Error('Must be a JSON object');
+            }
+            dataToSend = cookies;
         }
     } catch (e) {
-        errorEl.textContent = 'Invalid JSON format: ' + e.message;
+        errorEl.textContent = 'Invalid format: ' + e.message;
         errorEl.classList.remove('hidden');
         return;
     }
@@ -84,7 +110,7 @@ async function saveCookies() {
         const res = await fetch(`${API}/api/cookies`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cookies)
+            body: JSON.stringify(dataToSend)
         });
         const data = await res.json();
 
@@ -96,6 +122,7 @@ async function saveCookies() {
 
         hideCookieModal();
         checkAuth();
+        alert(`Successfully saved ${data.count || 'cookies'}!`);
     } catch (err) {
         errorEl.textContent = 'Failed to save cookies';
         errorEl.classList.remove('hidden');
@@ -991,6 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cookie modal
     document.getElementById('login-btn').onclick = showCookieModal;
+    document.getElementById('register-btn').onclick = autoRegister;
     document.getElementById('cancel-modal-btn').onclick = hideCookieModal;
     document.getElementById('save-cookies-btn').onclick = saveCookies;
     document.getElementById('cookie-modal').onclick = (e) => {

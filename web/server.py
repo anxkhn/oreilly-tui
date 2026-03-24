@@ -69,6 +69,8 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
             self._handle_download(data)
         elif self.path == "/api/cookies":
             self._handle_cookies(data)
+        elif self.path == "/api/register-academic":
+            self._handle_register_academic(data)
         elif self.path == "/api/cancel":
             self._handle_cancel()
         elif self.path == "/api/reveal":
@@ -173,14 +175,112 @@ class DownloaderHandler(SimpleHTTPRequestHandler):
 
     def _handle_cookies(self, data: dict):
         """Save cookies from user input."""
-        if not isinstance(data, dict) or not data:
-            self._send_json({"error": "Invalid cookie data"}, 400)
+        if not data:
+            self._send_json({"error": "No data provided"}, 400)
             return
 
         try:
-            config.COOKIES_FILE.write_text(json.dumps(data, indent=2))
+            cookies = {}
+
+            if "cookie_string" in data and isinstance(data["cookie_string"], str):
+                for cookie_pair in data["cookie_string"].split(";"):
+                    cookie_pair = cookie_pair.strip()
+                    if not cookie_pair:
+                        continue
+                    if "=" in cookie_pair:
+                        key, value = cookie_pair.split("=", 1)
+                        cookies[key.strip()] = value.strip()
+            elif isinstance(data, dict):
+                cookies = data
+
+            if not cookies:
+                raise ValueError("No valid cookies found")
+
+            config.COOKIES_FILE.write_text(json.dumps(cookies, indent=2))
             self.kernel.http.reload_cookies()
-            self._send_json({"success": True})
+            self._send_json({"success": True, "count": len(cookies)})
+        except Exception as e:
+            self._send_json({"error": str(e)}, 500)
+
+    def _handle_register_academic(self, data: dict):
+        """Handle academic SSO registration."""
+        import random
+        import string
+        import requests
+
+        domains = [
+            "baylor.edu",
+            "tamu.edu",
+            "stanford.edu",
+            "mit.edu",
+            "gatech.edu",
+            "harvard.edu",
+            "yale.edu",
+            "princeton.edu",
+            "columbia.edu",
+            "duke.edu",
+        ]
+        username = "".join(random.choices(string.ascii_lowercase, k=10))
+        domain = random.choice(domains)
+        email = f"{username}@{domain}"
+
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.7",
+            "Cache-Control": "no-cache",
+            "Content-Type": "application/json",
+            "Origin": "https://www.oreilly.com",
+            "Pragma": "no-cache",
+            "Priority": "u=1, i",
+            "Referer": "https://www.oreilly.com/",
+            "Sec-Ch-Ua": '"Not A;Brand";v="99", "Brave";v="145", "Chromium";v="145"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"macOS"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Gpc": "1",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+        }
+
+        try:
+            session = requests.Session()
+            session.headers.update(headers)
+
+            reg_data = {
+                "email": email,
+                "signature": "",
+                "timestamp": "",
+                "referer": "",
+                "ar": "true",
+            }
+
+            response = session.post(
+                "https://www.oreilly.com/api/v1/registration/academic/",
+                json=reg_data,
+                timeout=30,
+            )
+
+            if response.status_code not in (200, 201):
+                self._send_json(
+                    {"error": f"Registration failed: HTTP {response.status_code}"}, 400
+                )
+                return
+
+            cookies_dict = {}
+            for cookie in session.cookies:
+                cookies_dict[cookie.name] = cookie.value
+
+            if not cookies_dict or "orm-jwt" not in cookies_dict:
+                self._send_json(
+                    {"error": "Failed to extract cookies from registration response"},
+                    400,
+                )
+                return
+
+            config.COOKIES_FILE.write_text(json.dumps(cookies_dict, indent=2))
+            self.kernel.http.reload_cookies()
+            self._send_json({"success": True, "email": email})
+
         except Exception as e:
             self._send_json({"error": str(e)}, 500)
 
